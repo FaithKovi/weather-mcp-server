@@ -1,8 +1,10 @@
 import os
 import json
 import logging
+import asyncio
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import aiohttp
@@ -96,6 +98,32 @@ MCP_TOOLS = {
         "handler": get_current_weather_tool
     }
 }
+
+# SSE Generator for MCP
+async def mcp_sse_generator():
+    """Generate SSE events for MCP protocol"""
+    # Send initial connection event
+    yield f"data: {json.dumps({'type': 'connection', 'status': 'connected'})}\n\n"
+    
+    # Keep connection alive
+    while True:
+        await asyncio.sleep(30)  # Send heartbeat every 30 seconds
+        yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': asyncio.get_event_loop().time()})}\n\n"
+
+# MCP SSE Endpoint
+@app.get("/mcp")
+async def mcp_sse():
+    """MCP Server-Sent Events endpoint"""
+    return StreamingResponse(
+        mcp_sse_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Cache-Control"
+        }
+    )
 
 # MCP Protocol Endpoints
 
